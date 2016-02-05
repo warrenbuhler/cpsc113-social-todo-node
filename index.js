@@ -56,14 +56,27 @@ function isLoggedIn(req, res, next){
 
 // Middleware that loads a users tasks if they are logged in.
 function loadUserTasks(req, res, next) {
+  var creator = null;
   if(!res.locals.currentUser){
     return next();
   }
+  
   Tasks.find({}).or([
       {owner: res.locals.currentUser},
       {collaborators: res.locals.currentUser.email}])
     .exec(function(err, tasks){
       if(!err){
+        for (var i = 0; i < tasks.length; i++)
+      {
+        if(tasks[i].owner.toString() == res.locals.currentUser._id.toString())
+        {
+          tasks[i].creator = true;
+        }
+        else
+        {
+          tasks[i].creator = false;
+        }
+      }
         res.locals.tasks = tasks;
       }
       next();
@@ -148,12 +161,106 @@ app.post('/task/create', function(req, res){
   newTask.title = req.body.title;
   newTask.description = req.body.description;
   newTask.collaborators = [req.body.collaborator1, req.body.collaborator2, req.body.collaborator3];
+  newTask.isComplete = false;
+  newTask.isUrgent = false;
   newTask.save(function(err, savedTask){
     if(err || !savedTask){
       res.send('Error saving task!');
     }else{
       res.redirect('/');
     }
+  });
+});
+
+app.post('/task/toggle/:id', function(req, res){
+  Tasks.findById(req.params.id, function(err, task){
+    if(task.isComplete)
+    {
+      //if the task is complete, toggle it to incomplete
+      Tasks.update({_id:req.params.id}, {isComplete:false}, 
+        function(err){
+          if(err)
+          {
+            res.send('There was a problem marking the task as complete')
+          }
+          else
+          {
+            res.redirect('/');
+          }
+        });
+        // toggle urgency to false
+      
+    }
+      else
+      {
+        //if task was incomplete, toggle it to complete 
+        Tasks.update({_id:req.params.id}, {isComplete: true},
+        function(err){
+          if(err)
+          {
+            res.send('There was a problem marking the task as complete');
+          }
+          else
+          {
+            res.redirect('/');
+          }
+       
+      });
+  }
+})
+});
+
+app.post('/task/urgent/:id', function(req, res){
+  Tasks.findById(req.params.id, function(err, task){
+    if(task.isUrgent)
+    {
+      //if the task is urgent, toggle it to non urgent
+      Tasks.update({_id:req.params.id}, {isUrgent:false}, 
+        function(err){
+          if(err)
+          {
+            res.send('There was a problem marking the task as urgent')
+          }
+          else
+          {
+            res.redirect('/');
+          }
+        });
+    }
+      else
+      {
+        //if task was not urgent, toggle it to urgent 
+        Tasks.update({_id:req.params.id}, {isUrgent: true},
+        function(err){
+          if(err)
+          {
+            res.send('There was a problem marking the task as urgent');
+          }
+          else
+          {
+            res.redirect('/');
+          }
+      });
+  }
+})
+});
+
+//remove task
+app.post('/task/delete/:id', function(req, res){
+  Tasks.findById(req.params.id, function(err, task){
+  
+      task.remove(function (err) {
+        if(err)
+        {
+          res.send('There was an error deleting the task');
+        }
+        else
+        {
+          res.redirect('/');
+        }
+      });
+      
+      
   });
 });
 
